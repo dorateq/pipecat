@@ -56,6 +56,7 @@ from pipecat.processors.aggregators.llm_response import (
 from pipecat.processors.aggregators.openai_llm_context import OpenAILLMContext
 from pipecat.processors.frame_processor import FrameDirection
 from pipecat.services.ai_service import AIService
+from pipecat.services.mixins.turn_completion import TurnCompletionMixin
 
 # Type alias for a callable that handles LLM function calls.
 FunctionCallHandler = Callable[["FunctionCallParams"], Awaitable[None]]
@@ -142,7 +143,7 @@ class FunctionCallRunnerItem:
     run_llm: Optional[bool] = None
 
 
-class LLMService(AIService):
+class LLMService(TurnCompletionMixin, AIService):
     """Base class for all LLM services.
 
     Handles function calling registration and execution with support for both
@@ -170,17 +171,23 @@ class LLMService(AIService):
     # However, subclasses should override this with a more specific adapter when necessary.
     adapter_class: Type[BaseLLMAdapter] = OpenAILLMAdapter
 
-    def __init__(self, run_in_parallel: bool = True, **kwargs):
+    def __init__(
+        self, run_in_parallel: bool = True, enable_turn_completion: bool = False, **kwargs
+    ):
         """Initialize the LLM service.
 
         Args:
             run_in_parallel: Whether to run function calls in parallel or sequentially.
                 Defaults to True.
+            enable_turn_completion: Whether to enable turn completion detection.
+                When enabled, the service will detect <turn>COMPLETE</turn> and
+                <turn>INCOMPLETE</turn> markers in LLM responses. Defaults to False.
             **kwargs: Additional arguments passed to the parent AIService.
 
         """
         super().__init__(**kwargs)
         self._run_in_parallel = run_in_parallel
+        self._enable_turn_completion = enable_turn_completion
         self._start_callbacks = {}
         self._adapter = self.adapter_class()
         self._functions: Dict[Optional[str], FunctionCallRegistryItem] = {}
